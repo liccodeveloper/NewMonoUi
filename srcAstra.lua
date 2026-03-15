@@ -785,6 +785,16 @@ function Library._CreateTab(section, name, icon)
     })
     local tabStroke = Stroke(tabBtn, c.Border, 1)
 
+    -- Barra vertical branca no canto esquerdo (visivel apenas quando ativa)
+    local accentBar = New("Frame", {
+        BackgroundColor3       = c.Text,
+        BackgroundTransparency = 1,
+        BorderSizePixel        = 0,
+        Size                   = UDim2.new(0, 2, 1, 0),
+        ZIndex                 = 2,
+        Parent                 = tabBtn,
+    })
+
     local iconLabel = New("ImageLabel", {
         BackgroundTransparency = 1,
         Image            = icon or "rbxassetid://112235310154264",
@@ -846,6 +856,7 @@ function Library._CreateTab(section, name, icon)
 
     tab.button       = tabBtn
     tab.stroke       = tabStroke
+    tab.accentBar    = accentBar
     tab.icon         = iconLabel
     tab.textLabel    = tabText
     tab.textGradient = textGradient
@@ -878,17 +889,21 @@ end
 
 function Library._SelectTab(lib, tab, btn, stroke, icon, textLabel, textGradient)
     if lib.currentTab then
-        lib.currentTab.content.Visible       = false
-        lib.currentTab.button.BackgroundTransparency = 1
-        lib.currentTab.icon.ImageColor3      = c.TextDark
-        lib.currentTab.stroke.Transparency   = 1
-        if lib.currentTab.textGradient then lib.currentTab.textGradient.Enabled = true end
+        local p = lib.currentTab
+        p.content.Visible                = false
+        p.button.BackgroundTransparency  = 1
+        p.icon.ImageColor3               = c.TextDark
+        p.stroke.Transparency            = 1
+        if p.accentBar then p.accentBar.BackgroundTransparency = 1 end
+        if p.textGradient then p.textGradient.Enabled = true end
     end
     lib.currentTab             = tab
     tab.content.Visible        = true
-    btn.BackgroundTransparency = 1
+    btn.BackgroundTransparency = 0.85
+    btn.BackgroundColor3       = c.Secondary
     icon.ImageColor3           = c.Text
-    stroke.Transparency        = 1
+    stroke.Transparency        = 0
+    if tab.accentBar then tab.accentBar.BackgroundTransparency = 0 end
     if textGradient then textGradient.Enabled = false end
     textLabel.TextColor3       = c.Text
 end
@@ -1113,9 +1128,9 @@ function Library._CreateToggle(tab, config)
     local btn = New("TextButton", {Text="", BackgroundTransparency=1, Size=UDim2.new(1,0,1,0), Parent=frame})
 
     local function UpdateToggle()
-        switchBg.BackgroundColor3 = enabled and c.Toggle.Enabled or c.Toggle.Disabled
-        switchStroke.Color        = enabled and c.Toggle.Enabled or c.BorderMid
-        switchCircle.Position     = enabled and UDim2.new(0,21,0.5,0) or UDim2.new(0,4,0.5,0)
+        Tween(switchBg,     {BackgroundColor3 = enabled and c.Toggle.Enabled or c.Toggle.Disabled}, animspeed.Fast)
+        Tween(switchCircle, {Position = enabled and UDim2.new(0,21,0.5,0) or UDim2.new(0,4,0.5,0)}, animspeed.Fast)
+        switchStroke.Color = enabled and c.Toggle.Enabled or c.BorderMid
     end
     btn.MouseButton1Click:Connect(function()
         enabled = not enabled; UpdateToggle(); pcall(callback, enabled)
@@ -1147,26 +1162,46 @@ function Library._CreateCheckbox(tab, config)
     New("TextLabel", {FontFace=f.Regular, TextColor3=c.Text, Text=name,
         TextXAlignment=Enum.TextXAlignment.Left, BackgroundTransparency=1,
         Position=UDim2.new(0,10,0.5,-10), TextSize=textsize.Normal, Size=UDim2.new(0,200,0,20), Parent=frame})
+
     local checkBg = New("Frame", {
-        BackgroundColor3=enabled and c.Checkbox.Enabled or c.Checkbox.Disabled,
-        AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-10,0.5,0),
-        BorderSizePixel=0, Size=UDim2.new(0,18,0,18), Parent=frame,
+        BackgroundColor3 = enabled and c.Checkbox.Enabled or c.Checkbox.Disabled,
+        AnchorPoint      = Vector2.new(1, 0.5),
+        Position         = UDim2.new(1, -10, 0.5, 0),
+        BorderSizePixel  = 0,
+        Size             = UDim2.new(0, 18, 0, 18),
+        Parent           = frame,
     })
     local checkStroke = New("UIStroke", {
-        ApplyStrokeMode=Enum.ApplyStrokeMode.Border,
-        Color=enabled and c.Checkbox.Enabled or c.Checkbox.Border, Thickness=1.5, Parent=checkBg,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+        Color     = enabled and c.Checkbox.Enabled or c.Checkbox.Border,
+        Thickness = 1.5,
+        Parent    = checkBg,
     })
+    -- Checkmark ✓ visivel quando ativado
+    local checkMark = New("TextLabel", {
+        Text                  = "✓",
+        FontFace              = f.Bold,
+        TextSize              = 11,
+        TextColor3            = c.Checkbox.Check,
+        BackgroundTransparency = 1,
+        Size                  = UDim2.new(1, 0, 1, 0),
+        Visible               = enabled,
+        ZIndex                = 2,
+        Parent                = checkBg,
+    })
+
     local btn = New("TextButton", {Text="", BackgroundTransparency=1, Size=UDim2.new(1,0,1,0), Parent=frame})
 
     local function UpdateCheckbox()
-        checkBg.BackgroundColor3 = enabled and c.Checkbox.Enabled or c.Checkbox.Disabled
-        checkStroke.Color        = enabled and c.Checkbox.Enabled or c.Checkbox.Border
+        Tween(checkBg, {BackgroundColor3 = enabled and c.Checkbox.Enabled or c.Checkbox.Disabled}, animspeed.Fast)
+        checkStroke.Color  = enabled and c.Checkbox.Enabled or c.Checkbox.Border
+        checkMark.Visible  = enabled
     end
     btn.MouseButton1Click:Connect(function()
         enabled = not enabled; UpdateCheckbox(); pcall(callback, enabled)
     end)
-    btn.MouseEnter:Connect(function() if not enabled then checkStroke.Color=Color3.fromRGB(90,90,90) end end)
-    btn.MouseLeave:Connect(function() if not enabled then checkStroke.Color=c.Checkbox.Border end end)
+    btn.MouseEnter:Connect(function() if not enabled then checkStroke.Color = Color3.fromRGB(90,90,90) end end)
+    btn.MouseLeave:Connect(function() if not enabled then checkStroke.Color = c.Checkbox.Border end end)
 
     local methods = {
         SetValue = function(_, v) enabled=v; UpdateCheckbox(); pcall(callback, enabled) end,
