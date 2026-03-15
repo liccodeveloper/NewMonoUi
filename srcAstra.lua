@@ -1086,7 +1086,7 @@ function Library._CreateSlider(tab, config)
     local valLbl = New("TextLabel", {FontFace=f.Regular, TextColor3=c.Text, Text=Fmt(cur),
         TextXAlignment=Enum.TextXAlignment.Right, BackgroundTransparency=1,
         Position=UDim2.new(1,-70,0,5), TextSize=textsize.Normal, Size=UDim2.new(0,60,0,20), Parent=frame})
-    local trackBg = New("Frame", {BackgroundColor3=Color3.fromRGB(11,11,11),
+    local trackBg = New("Frame", {BackgroundColor3=c.Toggle.Disabled,
         Position=UDim2.new(0,10,0,29), BorderSizePixel=0, Size=UDim2.new(1,-20,0,7), Parent=frame})
     local sliderFill = New("Frame", {BackgroundColor3=c.Accent, BorderSizePixel=0,
         Size=UDim2.new((cur-min)/math.max(max-min,0.001),0,1,0), Parent=trackBg})
@@ -1850,7 +1850,7 @@ function Library._CreateProgressBar(tab, config)
     local valLbl = New("TextLabel", {FontFace=f.Regular, TextColor3=c.TextDark, Text=tostring(cur)..suffix,
         TextXAlignment=Enum.TextXAlignment.Right, BackgroundTransparency=1,
         Position=UDim2.new(1,-60,0,5), TextSize=textsize.Normal, Size=UDim2.new(0,50,0,20), Parent=frame})
-    local trackBg = New("Frame", {BackgroundColor3=Color3.fromRGB(11,11,11),
+    local trackBg = New("Frame", {BackgroundColor3=c.Toggle.Disabled,
         Position=UDim2.new(0,10,0,29), BorderSizePixel=0, Size=UDim2.new(1,-20,0,7), Parent=frame})
     local ratio = (max-min)>0 and (cur-min)/(max-min) or 0
     local fill  = New("Frame", {BackgroundColor3=c.Accent, BorderSizePixel=0,
