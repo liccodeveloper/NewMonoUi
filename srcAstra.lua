@@ -784,7 +784,7 @@ function Library:CreateSection(name)
         Parent            = sectionFrame,
     })
     Layout(tabsContainer, 2, Enum.SortOrder.LayoutOrder)
-    Padding(tabsContainer, 0, 0, 15, 0)
+    Padding(tabsContainer, 0, 0, 5, 0)
 
     local function ToggleSection()
         section.expanded  = not section.expanded
