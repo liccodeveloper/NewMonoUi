@@ -1176,20 +1176,12 @@ end
 function Library:_CreateFloatingShortcut(name, callback)
     if not IsMobile() then return end
 
-    -- Se já existe um shortcut com esse nome, só mostra de novo
-    if self._shortcuts[name] then
-        local existing = self._shortcuts[name]
-        if existing.wrapper and existing.wrapper.Parent then
-            existing.wrapper.Visible = true
-            return existing.wrapper
-        end
-    end
+    -- Se já existe, retorna (não recria)
+    if self._shortcuts[name] then return end
 
     local screenGui = self.screenGui
     local shortcutIndex = 0
     for _ in pairs(self._shortcuts) do shortcutIndex = shortcutIndex + 1 end
-
-    -- Posicionar em coluna no lado direito, empilhados
     local startY = 80 + (shortcutIndex * 46)
 
     local wrapper = New("Frame", {
@@ -1206,7 +1198,6 @@ function Library:_CreateFloatingShortcut(name, callback)
     })
     Stroke(wrapper, c.Border)
 
-    -- Nome da ação
     New("TextLabel", {
         Text                  = string.upper(name),
         FontFace              = f.Bold,
@@ -1221,7 +1212,7 @@ function Library:_CreateFloatingShortcut(name, callback)
         Parent                = wrapper,
     })
 
-    -- Botão X para esconder (branco, canto direito, área grande para toque)
+    -- Botão X — área grande (36x36) para toque fácil, cor branca
     local closeBtn = New("TextButton", {
         Text                  = "✕",
         FontFace              = f.Bold,
@@ -1236,11 +1227,10 @@ function Library:_CreateFloatingShortcut(name, callback)
     })
     closeBtn.MouseButton1Click:Connect(function()
         wrapper.Visible = false
-        self._shortcuts[name].dismissed = true
     end)
 
-    -- Área de clique principal (executa callback)
-    local hitBtn = New("TextButton", {
+    -- Área de toque/drag (cobre tudo EXCETO o X)
+    local hitArea = New("TextButton", {
         Text                  = "",
         BackgroundTransparency = 1,
         Position              = UDim2.new(0, 0, 0, 0),
@@ -1248,19 +1238,13 @@ function Library:_CreateFloatingShortcut(name, callback)
         ZIndex                = 8002,
         Parent                = wrapper,
     })
-    hitBtn.MouseButton1Click:Connect(function()
-        Tween(wrapper, {BackgroundTransparency = 0.0}, animspeed.Fast)
-        task.wait(0.12)
-        Tween(wrapper, {BackgroundTransparency = 0.15}, animspeed.Fast)
-        pcall(callback)
-    end)
 
-    -- Drag — usa o próprio wrapper para arrastar, com detecção de tap vs drag
+    -- Drag + Tap unificado (apenas UM handler, sem duplicar callback)
     local dragging = false
     local dragStart, dragStartPos
     local dragMoved = false
 
-    hitBtn.InputBegan:Connect(function(inp)
+    hitArea.InputBegan:Connect(function(inp)
         if inp.UserInputType ~= Enum.UserInputType.Touch
         and inp.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
         dragging = true
@@ -1270,10 +1254,12 @@ function Library:_CreateFloatingShortcut(name, callback)
         Library._activeDragger = function(i)
             if not dragging then return end
             local d = i.Position - dragStart
-            if d.Magnitude > 8 then dragMoved = true end
-            wrapper.Position = UDim2.new(
-                dragStartPos.X.Scale, dragStartPos.X.Offset + d.X,
-                dragStartPos.Y.Scale, dragStartPos.Y.Offset + d.Y)
+            if d.Magnitude > 10 then dragMoved = true end
+            if dragMoved then
+                wrapper.Position = UDim2.new(
+                    dragStartPos.X.Scale, dragStartPos.X.Offset + d.X,
+                    dragStartPos.Y.Scale, dragStartPos.Y.Offset + d.Y)
+            end
         end
         local conn; conn = inp.Changed:Connect(function()
             if inp.UserInputState == Enum.UserInputState.End then
@@ -1282,10 +1268,10 @@ function Library:_CreateFloatingShortcut(name, callback)
                 dragMoved = false
                 Library._activeDragger = nil
                 conn:Disconnect()
-                -- Se não arrastou, é um tap — executar callback
+                -- Tap (não arrastou) → executar callback
                 if not wasDrag then
                     Tween(wrapper, {BackgroundTransparency = 0.0}, animspeed.Fast)
-                    task.wait(0.12)
+                    task.wait(0.1)
                     Tween(wrapper, {BackgroundTransparency = 0.15}, animspeed.Fast)
                     pcall(callback)
                 end
@@ -1293,29 +1279,20 @@ function Library:_CreateFloatingShortcut(name, callback)
         end)
     end)
 
-    -- Salvar referência para poder reexibir depois
-    self._shortcuts[name] = { wrapper = wrapper, dismissed = false }
-
+    self._shortcuts[name] = wrapper
     return wrapper
 end
 
--- Mostra o shortcut (chamado quando toggle liga)
 function Library:_ShowShortcut(name)
     if not IsMobile() then return end
-    local sc = self._shortcuts[name]
-    if sc and sc.wrapper and sc.wrapper.Parent then
-        sc.wrapper.Visible = true
-        sc.dismissed = false
-    end
+    local w = self._shortcuts[name]
+    if w and w.Parent then w.Visible = true end
 end
 
--- Esconde o shortcut (chamado quando toggle desliga)
 function Library:_HideShortcut(name)
     if not IsMobile() then return end
-    local sc = self._shortcuts[name]
-    if sc and sc.wrapper then
-        sc.wrapper.Visible = false
-    end
+    local w = self._shortcuts[name]
+    if w then w.Visible = false end
 end
 
 function Library._CreateButton(tab, config)
@@ -1340,9 +1317,15 @@ function Library._CreateButton(tab, config)
         pcall(callback)
     end)
     if shortcut then
+        -- Cria shortcut hidden; mostra na primeira vez que o botão for clicado
         tab._library:_CreateFloatingShortcut(name, callback)
-        -- Button shortcut: always visible on mobile
-        tab._library:_ShowShortcut(name)
+        local shownOnce = false
+        btn.MouseButton1Click:Connect(function()
+            if not shownOnce then
+                tab._library:_ShowShortcut(name)
+                shownOnce = true
+            end
+        end)
     end
     return {SetText = function(_, t) nameLbl.Text = t end}
 end
@@ -1394,24 +1377,19 @@ function Library._CreateToggle(tab, config)
             function() return enabled end, function(v) methods:SetValue(v) end)
     end
     if shortcut then
-        -- Criar o shortcut (começa hidden), alterna toggle ao clicar
+        -- Cria shortcut hidden. Callback do shortcut alterna o toggle.
         tab._library:_CreateFloatingShortcut(name, function()
-            enabled = not enabled; UpdateToggle(); pcall(callback, enabled)
-            -- Se desligou, esconde o shortcut
-            if not enabled then tab._library:_HideShortcut(name) end
+            enabled = not enabled
+            UpdateToggle()
+            pcall(callback, enabled)
         end)
-        -- Se toggle começa ligado, mostra shortcut
-        if enabled then tab._library:_ShowShortcut(name) end
-        -- Interceptar SetValue para controlar o shortcut
-        local origSetVal = methods.SetValue
-        methods.SetValue = function(self_, v)
-            origSetVal(self_, v)
-            if v then tab._library:_ShowShortcut(name) else tab._library:_HideShortcut(name) end
-        end
-        -- Interceptar o click do botão também
-        local origClick = btn.MouseButton1Click
+        -- Quando toggle é ativado pelo BOTÃO no menu → mostra shortcut
+        -- Quando desativado → não esconde (o usuário pode querer reativar pelo shortcut)
         btn.MouseButton1Click:Connect(function()
-            if enabled then tab._library:_ShowShortcut(name) else tab._library:_HideShortcut(name) end
+            -- enabled já foi alterado pelo handler anterior
+            if enabled then
+                tab._library:_ShowShortcut(name)
+            end
         end)
     end
     return methods
