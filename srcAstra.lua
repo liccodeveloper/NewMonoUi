@@ -486,26 +486,45 @@ function Library:_CreateWindowControls()
     closeBtn.MouseEnter:Connect(function() closeBtn.ImageColor3 = Color3.fromRGB(255, 59, 59) end)
     closeBtn.MouseLeave:Connect(function() closeBtn.ImageColor3 = c.TextDark end)
 
-    -- Resize handle sharp: dois frames diagonais, sem imagem arredondada
+    -- Resize handle em L invertido (canto inferior direito):
+    -- linha horizontal na base + linha vertical na direita
     local resizeWrap = New("Frame", {
         Name                   = "ResizeHandle",
         BackgroundTransparency = 1,
         AnchorPoint            = Vector2.new(1, 1),
-        Position               = UDim2.new(1, 0, 1, 0),
-        Size                   = UDim2.new(0, 14, 0, 14),
+        Position               = UDim2.new(1, -2, 1, -2),
+        Size                   = UDim2.new(0, 10, 0, 10),
         BorderSizePixel        = 0,
         ZIndex                 = 8,
         Parent                 = self.container,
     })
-    New("Frame", {BackgroundColor3=c.TextDark, BorderSizePixel=0,
-        AnchorPoint=Vector2.new(0.5,0.5), Position=UDim2.new(0.5,0,0.5,0),
-        Size=UDim2.new(0,1,1.2,0), Rotation=-45, ZIndex=9, Parent=resizeWrap})
-    New("Frame", {BackgroundColor3=c.TextDark, BorderSizePixel=0,
-        AnchorPoint=Vector2.new(0.5,0.5), Position=UDim2.new(0.5,4,0.5,0),
-        Size=UDim2.new(0,1,0.7,0), Rotation=-45, ZIndex=9, Parent=resizeWrap})
+    -- linha horizontal (base do L)
+    New("Frame", {
+        BackgroundColor3 = c.TextDark,
+        BorderSizePixel  = 0,
+        AnchorPoint      = Vector2.new(0, 1),
+        Position         = UDim2.new(0, 0, 1, 0),
+        Size             = UDim2.new(1, 0, 0, 1),
+        ZIndex           = 9,
+        Parent           = resizeWrap,
+    })
+    -- linha vertical (lateral direita do L)
+    New("Frame", {
+        BackgroundColor3 = c.TextDark,
+        BorderSizePixel  = 0,
+        AnchorPoint      = Vector2.new(1, 0),
+        Position         = UDim2.new(1, 0, 0, 0),
+        Size             = UDim2.new(0, 1, 1, 0),
+        ZIndex           = 9,
+        Parent           = resizeWrap,
+    })
     local resizeClickArea = New("TextButton", {
         Text="", BackgroundTransparency=1,
-        Size=UDim2.new(1,0,1,0), ZIndex=10, Parent=resizeWrap,
+        AnchorPoint = Vector2.new(1, 1),
+        Position    = UDim2.new(1, 4, 1, 4),
+        Size        = UDim2.new(0, 18, 0, 18),
+        ZIndex      = 10,
+        Parent      = self.container,
     })
     self.resizeBtn = resizeWrap
     self:_SetupSmartResize(resizeClickArea, resizeWrap)
@@ -546,8 +565,7 @@ function Library:_CreateContentArea()
 
     self.contentContainer = New("ScrollingFrame", {
         Name                  = "ContentContainer",
-        ScrollBarThickness    = 3,
-        ScrollBarImageColor3  = Color3.fromRGB(46, 46, 46),
+        ScrollBarThickness    = 0,
         BackgroundTransparency = 1,
         Position              = UDim2.new(0, 166, 0, 0),
         Size                  = UDim2.new(1, -166, 1, 0),
@@ -736,13 +754,13 @@ function Library:CreateSection(name)
         Parent            = headerContainer,
     })
     New("TextLabel", {
-        FontFace          = f.Regular,
+        FontFace          = f.Bold,
         TextColor3        = c.TextDark,
-        Text              = name,
+        Text              = string.upper(name),
         TextXAlignment    = Enum.TextXAlignment.Left,
         BackgroundTransparency = 1,
         Position          = UDim2.new(0, 5, 0, 0),
-        TextSize          = textsize.Small,
+        TextSize          = textsize.Tiny,
         Size              = UDim2.new(1, -25, 1, 0),
         Parent            = headerContainer,
     })
@@ -1386,7 +1404,7 @@ function Library._CreateDropdown(tab, config)
         BackgroundTransparency=1, BorderSizePixel=0,
         Position=UDim2.new(0,0,0,searchHeight), Size=UDim2.new(1,0,1,-searchHeight),
         CanvasSize=UDim2.new(0,0,0,#options*optH),
-        ScrollBarThickness=3, ScrollBarImageColor3=Color3.fromRGB(60,60,60),
+        ScrollBarThickness=0,
         ZIndex=100, Parent=optContainer,
     })
     Layout(optScroll, 0, Enum.SortOrder.LayoutOrder)
@@ -1886,7 +1904,7 @@ function Library._CreateTable(tab, config)
         BackgroundTransparency=1, BorderSizePixel=0,
         Position=UDim2.new(0,0,0,57), Size=UDim2.new(1,0,0,0),
         CanvasSize=UDim2.new(0,0,0,0), AutomaticCanvasSize=Enum.AutomaticSize.Y,
-        ScrollBarThickness=3, ScrollBarImageColor3=Color3.fromRGB(60,60,60),
+        ScrollBarThickness=0,
         ScrollingDirection=Enum.ScrollingDirection.Y, Parent=frame,
     })
     Layout(bodyScroll, 0, Enum.SortOrder.LayoutOrder)
