@@ -1662,20 +1662,7 @@ function Library._CreateKeybind(tab, config, lib)
         TextXAlignment=Enum.TextXAlignment.Left, BackgroundTransparency=1,
         Position=UDim2.new(0,10,0.5,-10), TextSize=textsize.Normal, Size=UDim2.new(0,200,0,20), Parent=frame})
 
-    local statusDot = nil
-    if linkedToggle then
-        statusDot = New("Frame", {
-            BackgroundColor3=linkedToggle:GetValue() and c.Accent or c.TextDark,
-            AnchorPoint=Vector2.new(0,0.5), Position=UDim2.new(0,10,0.5,0),
-            Size=UDim2.new(0,6,0,6), BorderSizePixel=0, Parent=frame,
-        })
-        nameLbl.Position = UDim2.new(0,22,0.5,-10)
-        local origSet = linkedToggle.SetValue
-        linkedToggle.SetValue = function(self_, v)
-            origSet(self_, v)
-            if statusDot then statusDot.BackgroundColor3 = v and c.Accent or c.TextDark end
-        end
-    end
+
 
     local keybindBox = New("Frame", {
         BackgroundColor3=c.Secondary, BackgroundTransparency=0.04,
