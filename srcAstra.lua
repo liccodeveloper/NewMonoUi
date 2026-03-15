@@ -1125,9 +1125,108 @@ function Library._CreateSlider(tab, config)
     return methods
 end
 
+
+-- ══════════════════════════════════════════════════════════════════════
+-- FLOATING SHORTCUT BUTTON
+-- Criado automaticamente quando Shortcut = true em qualquer elemento.
+-- Só aparece em dispositivos mobile (TouchEnabled e sem teclado).
+-- Arrastável, tem X para fechar, executa a mesma callback do elemento.
+-- ══════════════════════════════════════════════════════════════════════
+function Library:_CreateFloatingShortcut(name, callback)
+    if not IsMobile() then return end
+
+    local screenGui = self.screenGui
+
+    -- Posição inicial: canto inferior direito, um pouco acima do centro
+    local startX = 0.75
+    local startY = 0.72
+
+    local wrapper = New("Frame", {
+        Name                   = "Shortcut_" .. name,
+        BackgroundColor3       = c.Background,
+        BackgroundTransparency = 0.25,
+        BorderSizePixel        = 0,
+        AnchorPoint            = Vector2.new(0.5, 0.5),
+        Position               = UDim2.new(startX, 0, startY, 0),
+        Size                   = UDim2.new(0, 110, 0, 36),
+        ZIndex                 = 8000,
+        Parent                 = screenGui,
+    })
+    Stroke(wrapper, c.Border, 1)
+
+    -- Nome da ação
+    New("TextLabel", {
+        Text                  = string.upper(name),
+        FontFace              = f.Bold,
+        TextSize              = textsize.Tiny,
+        TextColor3            = c.Text,
+        BackgroundTransparency = 1,
+        AnchorPoint           = Vector2.new(0, 0.5),
+        Position              = UDim2.new(0, 10, 0.5, 0),
+        Size                  = UDim2.new(1, -30, 0, 16),
+        ZIndex                = 8001,
+        Parent                = wrapper,
+    })
+
+    -- Botão X para fechar
+    local closeBtn = New("TextButton", {
+        Text                  = "×",
+        FontFace              = f.Regular,
+        TextSize              = 14,
+        TextColor3            = c.TextDark,
+        BackgroundTransparency = 1,
+        AnchorPoint           = Vector2.new(1, 0.5),
+        Position              = UDim2.new(1, -4, 0.5, 0),
+        Size                  = UDim2.new(0, 20, 0, 20),
+        ZIndex                = 8002,
+        Parent                = wrapper,
+    })
+    closeBtn.MouseEnter:Connect(function() closeBtn.TextColor3 = c.Danger end)
+    closeBtn.MouseLeave:Connect(function() closeBtn.TextColor3 = c.TextDark end)
+    closeBtn.MouseButton1Click:Connect(function()
+        wrapper:Destroy()
+    end)
+
+    -- Área de clique principal (executa callback)
+    local hitBtn = New("TextButton", {
+        Text                  = "",
+        BackgroundTransparency = 1,
+        Size                  = UDim2.new(1, -24, 1, 0),
+        ZIndex                = 8002,
+        Parent                = wrapper,
+    })
+    hitBtn.MouseButton1Click:Connect(function()
+        Tween(wrapper, {BackgroundTransparency = 0.05}, animspeed.Fast)
+        task.wait(0.12)
+        Tween(wrapper, {BackgroundTransparency = 0.25}, animspeed.Fast)
+        pcall(callback)
+    end)
+
+    -- Drag
+    local dragging, ds, sp = false, nil, nil
+    wrapper.InputBegan:Connect(function(inp)
+        if inp.UserInputType ~= Enum.UserInputType.Touch
+        and inp.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+        dragging = true; ds = inp.Position; sp = wrapper.Position
+        Library._activeDragger = function(i)
+            if not dragging then return end
+            local d = i.Position - ds
+            wrapper.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
+        end
+        local conn; conn = inp.Changed:Connect(function()
+            if inp.UserInputState == Enum.UserInputState.End then
+                dragging = false; Library._activeDragger = nil; conn:Disconnect()
+            end
+        end)
+    end)
+
+    return wrapper
+end
+
 function Library._CreateButton(tab, config)
     local name     = config.Name     or "Button"
     local callback = config.Callback or function() end
+    local shortcut = config.Shortcut or false
     local frame = New("Frame", {
         BackgroundColor3=c.Secondary, BackgroundTransparency=0.4,
         BorderSizePixel=0, Size=UDim2.new(1,0,0,s.Button.Height), Parent=tab.content,
@@ -1145,6 +1244,9 @@ function Library._CreateButton(tab, config)
         frame.BackgroundTransparency = 0.4
         pcall(callback)
     end)
+    if shortcut then
+        tab._lib:_CreateFloatingShortcut(name, callback)
+    end
     return {SetText = function(_, t) nameLbl.Text = t end}
 end
 
@@ -1153,6 +1255,7 @@ function Library._CreateToggle(tab, config)
     local default  = config.Default  or false
     local callback = config.Callback or function() end
     local flag     = config.Flag
+    local shortcut = config.Shortcut or false
     local enabled  = default
 
     local frame = New("Frame", {
@@ -1192,6 +1295,12 @@ function Library._CreateToggle(tab, config)
     if flag and tab._library then
         tab._library:_RegisterConfigElement(flag, "Toggle",
             function() return enabled end, function(v) methods:SetValue(v) end)
+    end
+    if shortcut then
+        -- Para toggle o shortcut alterna o estado ao ser clicado
+        tab._lib:_CreateFloatingShortcut(name, function()
+            enabled = not enabled; UpdateToggle(); pcall(callback, enabled)
+        end)
     end
     return methods
 end
