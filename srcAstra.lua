@@ -204,6 +204,26 @@ function Library.new(title, configFolder, sizeConfig, options)
     self._defaultSize  = Vector2.new(def.Width or s.Window.Width,    def.Height or s.Window.Height)
     self._minSize      = Vector2.new(mn.Width  or s.MinWindow.Width,  mn.Height  or s.MinWindow.Height)
     self._maxSize      = Vector2.new(mx.Width  or s.MaxWindow.Width,  mx.Height  or s.MaxWindow.Height)
+
+    -- Mobile: auto-scale window to fit screen
+    if IsMobile() then
+        local vp = workspace.CurrentCamera.ViewportSize
+        local maxW = math.floor(vp.X * 0.92)
+        local maxH = math.floor(vp.Y * 0.75)
+        self._defaultSize = Vector2.new(
+            math.min(self._defaultSize.X, maxW),
+            math.min(self._defaultSize.Y, maxH)
+        )
+        self._minSize = Vector2.new(
+            math.min(self._minSize.X, maxW),
+            math.min(self._minSize.Y, maxH)
+        )
+        self._maxSize = Vector2.new(
+            math.min(self._maxSize.X, maxW),
+            math.min(self._maxSize.Y, maxH)
+        )
+    end
+
     self.sections      = {}
     self.currentTab    = nil
     self.minimized     = false
@@ -216,6 +236,7 @@ function Library.new(title, configFolder, sizeConfig, options)
     self._autoSave     = false
     self._currentConfig = "default"
     self._connections  = {}
+    self._shortcuts    = {}
 
     local opts = options or {}
     if opts.AccentColor then
@@ -396,6 +417,10 @@ function Library:_SetupMobileSupport()
 end
 
 function Library:_CreateMainWindow()
+    local mobile = IsMobile()
+    local topH = mobile and 35 or 45
+    self._topBarHeight = topH
+
     self.screenGui = New("ScreenGui", {
         Name           = n,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
@@ -416,7 +441,7 @@ function Library:_CreateMainWindow()
     self.topBar = New("Frame", {
         Name                  = "TopBar",
         BackgroundTransparency = 1,
-        Size                  = UDim2.new(1, 0, 0, 45),
+        Size                  = UDim2.new(1, 0, 0, topH),
         Parent                = self.container,
     })
 
@@ -426,10 +451,10 @@ function Library:_CreateMainWindow()
         TextColor3            = c.Text,
         Text                  = self.title,
         BackgroundTransparency = 1,
-        Position              = UDim2.new(0, 10, 0, 10),
+        Position              = UDim2.new(0, 10, 0, mobile and 7 or 10),
         TextXAlignment        = Enum.TextXAlignment.Left,
-        TextSize              = textsize.Title,
-        Size                  = UDim2.new(0, 150, 0, 25),
+        TextSize              = mobile and 12 or textsize.Title,
+        Size                  = UDim2.new(0, 150, 0, mobile and 20 or 25),
         Parent                = self.topBar,
     })
 
@@ -438,7 +463,7 @@ function Library:_CreateMainWindow()
     New("Frame", {
         Name             = "Header",
         BackgroundColor3 = c.Border,
-        Position         = UDim2.new(0, 0, 0, 45),
+        Position         = UDim2.new(0, 0, 0, topH),
         BorderSizePixel  = 0,
         Size             = UDim2.new(1, 0, 0, 1),
         Parent           = self.container,
@@ -451,21 +476,28 @@ function Library:_CreateMainWindow()
 end
 
 function Library:_CreateWindowControls()
+    local mobile = IsMobile()
+    local topH = self._topBarHeight or 45
+    local iconY = mobile and 10 or 15
+    local iconSz = mobile and 13 or 15
+
     local minimizeBtn = New("ImageLabel", {
         Name                  = "Minimize",
         ImageColor3           = c.TextDark,
         Image                 = "rbxassetid://82603981310445",
         BackgroundTransparency = 1,
         AnchorPoint           = Vector2.new(1, 0),
-        Position              = UDim2.new(1, -35, 0, 15),
-        Size                  = UDim2.new(0, 15, 0, 15),
+        Position              = UDim2.new(1, -35, 0, iconY),
+        Size                  = UDim2.new(0, iconSz, 0, iconSz),
         Parent                = self.topBar,
     })
     local minimizeClick = New("TextButton", {
         Text                  = "",
         Rotation              = 0.01,
         BackgroundTransparency = 1,
-        Size                  = UDim2.new(0, 21, 0, 15),
+        Size                  = UDim2.new(0, mobile and 30 or 21, 0, mobile and 30 or 15),
+        AnchorPoint           = Vector2.new(0.5, 0.5),
+        Position              = UDim2.new(0.5, 0, 0.5, 0),
         Parent                = minimizeBtn,
     })
     minimizeClick.MouseButton1Click:Connect(function() self:_ToggleMinimize() end)
@@ -478,16 +510,15 @@ function Library:_CreateWindowControls()
         Image                 = "rbxassetid://119943770201674",
         BackgroundTransparency = 1,
         AnchorPoint           = Vector2.new(1, 0),
-        Position              = UDim2.new(1, -10, 0, 15),
-        Size                  = UDim2.new(0, 15, 0, 15),
+        Position              = UDim2.new(1, -10, 0, iconY),
+        Size                  = UDim2.new(0, iconSz, 0, iconSz),
         Parent                = self.topBar,
     })
     closeBtn.MouseButton1Click:Connect(function() self:Destroy() end)
     closeBtn.MouseEnter:Connect(function() closeBtn.ImageColor3 = Color3.fromRGB(255, 59, 59) end)
     closeBtn.MouseLeave:Connect(function() closeBtn.ImageColor3 = c.TextDark end)
 
-    -- Resize handle em L invertido (canto inferior direito):
-    -- linha horizontal na base + linha vertical na direita
+    -- Resize handle em L invertido (canto inferior direito)
     local resizeWrap = New("Frame", {
         Name                   = "ResizeHandle",
         BackgroundTransparency = 1,
@@ -498,7 +529,6 @@ function Library:_CreateWindowControls()
         ZIndex                 = 8,
         Parent                 = self.container,
     })
-    -- linha horizontal (base do L)
     New("Frame", {
         BackgroundColor3 = c.TextDark,
         BorderSizePixel  = 0,
@@ -508,7 +538,6 @@ function Library:_CreateWindowControls()
         ZIndex           = 9,
         Parent           = resizeWrap,
     })
-    -- linha vertical (lateral direita do L)
     New("Frame", {
         BackgroundColor3 = c.TextDark,
         BorderSizePixel  = 0,
@@ -518,11 +547,13 @@ function Library:_CreateWindowControls()
         ZIndex           = 9,
         Parent           = resizeWrap,
     })
+    -- Área de toque maior no mobile para facilitar o resize
+    local touchSz = mobile and 40 or 18
     local resizeClickArea = New("TextButton", {
         Text="", BackgroundTransparency=1,
         AnchorPoint = Vector2.new(1, 1),
         Position    = UDim2.new(1, 4, 1, 4),
-        Size        = UDim2.new(0, 18, 0, 18),
+        Size        = UDim2.new(0, touchSz, 0, touchSz),
         ZIndex      = 10,
         Parent      = self.container,
     })
@@ -531,11 +562,15 @@ function Library:_CreateWindowControls()
 end
 
 function Library:_CreateContentArea()
+    local topH = self._topBarHeight or 45
+    local mobile = IsMobile()
+    local sideW = mobile and 130 or 165
+
     self.mainContent = New("Frame", {
         Name                  = "MainContent",
         BackgroundTransparency = 1,
-        Position              = UDim2.new(0, 0, 0, 46),
-        Size                  = UDim2.new(1, 0, 1, -46),
+        Position              = UDim2.new(0, 0, 0, topH + 1),
+        Size                  = UDim2.new(1, 0, 1, -(topH + 1)),
         ClipsDescendants      = true,
         Parent                = self.container,
     })
@@ -545,7 +580,7 @@ function Library:_CreateContentArea()
         ScrollBarThickness   = 0,
         BackgroundTransparency = 1,
         Position             = UDim2.new(0, 0, 0, 0),
-        Size                 = UDim2.new(0, 165, 1, 0),
+        Size                 = UDim2.new(0, sideW, 1, 0),
         CanvasSize           = UDim2.new(0, 0, 0, 0),
         AutomaticCanvasSize  = Enum.AutomaticSize.Y,
         ScrollingDirection   = Enum.ScrollingDirection.Y,
@@ -557,7 +592,7 @@ function Library:_CreateContentArea()
     New("Frame", {
         Name             = "Separator",
         BackgroundColor3 = c.Border,
-        Position         = UDim2.new(0, 165, 0, 0),
+        Position         = UDim2.new(0, sideW, 0, 0),
         BorderSizePixel  = 0,
         Size             = UDim2.new(0, 1, 1, 0),
         Parent           = self.mainContent,
@@ -567,15 +602,15 @@ function Library:_CreateContentArea()
         Name                  = "ContentContainer",
         ScrollBarThickness    = 0,
         BackgroundTransparency = 1,
-        Position              = UDim2.new(0, 166, 0, 0),
-        Size                  = UDim2.new(1, -166, 1, 0),
+        Position              = UDim2.new(0, sideW + 1, 0, 0),
+        Size                  = UDim2.new(1, -(sideW + 1), 1, 0),
         CanvasSize            = UDim2.new(0, 0, 0, 0),
         AutomaticCanvasSize   = Enum.AutomaticSize.Y,
         ScrollingDirection    = Enum.ScrollingDirection.Y,
         Parent                = self.mainContent,
     })
     Layout(self.contentContainer, 8, Enum.SortOrder.LayoutOrder)
-    Padding(self.contentContainer, 10, 10, 15, 15)
+    Padding(self.contentContainer, 10, 10, mobile and 8 or 15, mobile and 8 or 15)
 end
 
 function Library:_SetupSmartResize(handle, visual)
@@ -617,14 +652,15 @@ end
 
 
 function Library:_ToggleMinimize()
+    local topH = self._topBarHeight or 45
     self.minimized = not self.minimized
     if self.minimized then
         self.mainContent.Size  = UDim2.new(1, 0, 0, 0)
-        self.container.Size    = UDim2.new(0, self.container.AbsoluteSize.X, 0, 45)
+        self.container.Size    = UDim2.new(0, self.container.AbsoluteSize.X, 0, topH)
         if self.resizeBtn then self.resizeBtn.Visible = false end
     else
         self.container.Size    = UDim2.new(0, self.container.AbsoluteSize.X, 0, self._originalHeight)
-        self.mainContent.Size  = UDim2.new(1, 0, 1, -46)
+        self.mainContent.Size  = UDim2.new(1, 0, 1, -(topH + 1))
         if self.resizeBtn then self.resizeBtn.Visible = true end
     end
 end
@@ -1130,29 +1166,39 @@ end
 -- FLOATING SHORTCUT BUTTON
 -- Criado automaticamente quando Shortcut = true em qualquer elemento.
 -- Só aparece em dispositivos mobile (TouchEnabled e sem teclado).
--- Arrastável, tem X para fechar, executa a mesma callback do elemento.
+-- Arrastável, tem X para esconder (reaparece ao reativar), executa callback.
 -- ══════════════════════════════════════════════════════════════════════
 function Library:_CreateFloatingShortcut(name, callback)
     if not IsMobile() then return end
 
-    local screenGui = self.screenGui
+    -- Se já existe um shortcut com esse nome, só mostra de novo
+    if self._shortcuts[name] then
+        local existing = self._shortcuts[name]
+        if existing.wrapper and existing.wrapper.Parent then
+            existing.wrapper.Visible = true
+            return existing.wrapper
+        end
+    end
 
-    -- Posição inicial: canto inferior direito, um pouco acima do centro
-    local startX = 0.75
-    local startY = 0.72
+    local screenGui = self.screenGui
+    local shortcutIndex = 0
+    for _ in pairs(self._shortcuts) do shortcutIndex = shortcutIndex + 1 end
+
+    -- Posicionar em coluna no lado direito, empilhados
+    local startY = 80 + (shortcutIndex * 46)
 
     local wrapper = New("Frame", {
         Name                   = "Shortcut_" .. name,
         BackgroundColor3       = c.Background,
-        BackgroundTransparency = 0.25,
+        BackgroundTransparency = 0.15,
         BorderSizePixel        = 0,
-        AnchorPoint            = Vector2.new(0.5, 0.5),
-        Position               = UDim2.new(startX, 0, startY, 0),
-        Size                   = UDim2.new(0, 110, 0, 36),
+        AnchorPoint            = Vector2.new(1, 0),
+        Position               = UDim2.new(1, -10, 0, startY),
+        Size                   = UDim2.new(0, 120, 0, 36),
         ZIndex                 = 8000,
         Parent                 = screenGui,
     })
-    Stroke(wrapper, c.Border, 1)
+    Stroke(wrapper, c.Border)
 
     -- Nome da ação
     New("TextLabel", {
@@ -1160,65 +1206,88 @@ function Library:_CreateFloatingShortcut(name, callback)
         FontFace              = f.Bold,
         TextSize              = textsize.Tiny,
         TextColor3            = c.Text,
+        TextTruncate          = Enum.TextTruncate.AtEnd,
         BackgroundTransparency = 1,
-        AnchorPoint           = Vector2.new(0, 0.5),
-        Position              = UDim2.new(0, 10, 0.5, 0),
-        Size                  = UDim2.new(1, -30, 0, 16),
+        Position              = UDim2.new(0, 10, 0, 0),
+        Size                  = UDim2.new(1, -44, 1, 0),
+        TextXAlignment        = Enum.TextXAlignment.Left,
         ZIndex                = 8001,
         Parent                = wrapper,
     })
 
-    -- Botão X para fechar
+    -- Botão X para esconder (branco, canto direito, área grande para toque)
     local closeBtn = New("TextButton", {
-        Text                  = "×",
-        FontFace              = f.Regular,
-        TextSize              = 14,
-        TextColor3            = c.TextDark,
+        Text                  = "✕",
+        FontFace              = f.Bold,
+        TextSize              = 12,
+        TextColor3            = c.Text,
         BackgroundTransparency = 1,
-        AnchorPoint           = Vector2.new(1, 0.5),
-        Position              = UDim2.new(1, -4, 0.5, 0),
-        Size                  = UDim2.new(0, 20, 0, 20),
-        ZIndex                = 8002,
+        AnchorPoint           = Vector2.new(1, 0),
+        Position              = UDim2.new(1, 0, 0, 0),
+        Size                  = UDim2.new(0, 36, 0, 36),
+        ZIndex                = 8003,
         Parent                = wrapper,
     })
-    closeBtn.MouseEnter:Connect(function() closeBtn.TextColor3 = Color3.fromRGB(255, 59, 59) end)
-    closeBtn.MouseLeave:Connect(function() closeBtn.TextColor3 = c.TextDark end)
     closeBtn.MouseButton1Click:Connect(function()
-        wrapper:Destroy()
+        wrapper.Visible = false
     end)
 
     -- Área de clique principal (executa callback)
     local hitBtn = New("TextButton", {
         Text                  = "",
         BackgroundTransparency = 1,
-        Size                  = UDim2.new(1, -24, 1, 0),
+        Position              = UDim2.new(0, 0, 0, 0),
+        Size                  = UDim2.new(1, -36, 1, 0),
         ZIndex                = 8002,
         Parent                = wrapper,
     })
     hitBtn.MouseButton1Click:Connect(function()
-        Tween(wrapper, {BackgroundTransparency = 0.05}, animspeed.Fast)
+        Tween(wrapper, {BackgroundTransparency = 0.0}, animspeed.Fast)
         task.wait(0.12)
-        Tween(wrapper, {BackgroundTransparency = 0.25}, animspeed.Fast)
+        Tween(wrapper, {BackgroundTransparency = 0.15}, animspeed.Fast)
         pcall(callback)
     end)
 
-    -- Drag
-    local dragging, ds, sp = false, nil, nil
-    wrapper.InputBegan:Connect(function(inp)
+    -- Drag — usa o próprio wrapper para arrastar, com detecção de tap vs drag
+    local dragging = false
+    local dragStart, dragStartPos
+    local dragMoved = false
+
+    hitBtn.InputBegan:Connect(function(inp)
         if inp.UserInputType ~= Enum.UserInputType.Touch
         and inp.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-        dragging = true; ds = inp.Position; sp = wrapper.Position
+        dragging = true
+        dragMoved = false
+        dragStart = inp.Position
+        dragStartPos = wrapper.Position
         Library._activeDragger = function(i)
             if not dragging then return end
-            local d = i.Position - ds
-            wrapper.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
+            local d = i.Position - dragStart
+            if d.Magnitude > 8 then dragMoved = true end
+            wrapper.Position = UDim2.new(
+                dragStartPos.X.Scale, dragStartPos.X.Offset + d.X,
+                dragStartPos.Y.Scale, dragStartPos.Y.Offset + d.Y)
         end
         local conn; conn = inp.Changed:Connect(function()
             if inp.UserInputState == Enum.UserInputState.End then
-                dragging = false; Library._activeDragger = nil; conn:Disconnect()
+                local wasDrag = dragMoved
+                dragging = false
+                dragMoved = false
+                Library._activeDragger = nil
+                conn:Disconnect()
+                -- Se não arrastou, é um tap — executar callback
+                if not wasDrag then
+                    Tween(wrapper, {BackgroundTransparency = 0.0}, animspeed.Fast)
+                    task.wait(0.12)
+                    Tween(wrapper, {BackgroundTransparency = 0.15}, animspeed.Fast)
+                    pcall(callback)
+                end
             end
         end)
     end)
+
+    -- Salvar referência para poder reexibir depois
+    self._shortcuts[name] = { wrapper = wrapper }
 
     return wrapper
 end
