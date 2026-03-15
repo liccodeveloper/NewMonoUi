@@ -1245,7 +1245,7 @@ function Library._CreateButton(tab, config)
         pcall(callback)
     end)
     if shortcut then
-        tab._lib:_CreateFloatingShortcut(name, callback)
+        tab._library:_CreateFloatingShortcut(name, callback)
     end
     return {SetText = function(_, t) nameLbl.Text = t end}
 end
@@ -1298,7 +1298,7 @@ function Library._CreateToggle(tab, config)
     end
     if shortcut then
         -- Para toggle o shortcut alterna o estado ao ser clicado
-        tab._lib:_CreateFloatingShortcut(name, function()
+        tab._library:_CreateFloatingShortcut(name, function()
             enabled = not enabled; UpdateToggle(); pcall(callback, enabled)
         end)
     end
