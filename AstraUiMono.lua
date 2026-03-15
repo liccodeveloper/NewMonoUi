@@ -388,19 +388,42 @@ function Library:_Build()
         Parent         = self.Container,
     })
 
-    -- ── Sidebar (175 px) ──────────────────────────────────────────────
+    -- ── Sidebar wrapper (holds the scroll + right border) ────────────
+    -- NOTE: The border MUST live here, NOT inside the ScrollingFrame,
+    -- because ScrollingFrame has UIListLayout and any Frame child
+    -- (including a 1px divider) would be treated as a list item.
+    local sidebarWrap = Inst("Frame", {
+        Name             = "SidebarWrap",
+        BackgroundColor3 = C.Bg,
+        BorderSizePixel  = 0,
+        Size             = UDim2.new(0, 175, 1, 0),
+        Parent           = self.Body,
+    })
+    -- Right border line — lives on the wrapper, NOT the scroll frame
+    Inst("Frame", {
+        Name             = "SidebarBorder",
+        BackgroundColor3 = C.Line,
+        BorderSizePixel  = 0,
+        AnchorPoint      = Vector2.new(1, 0),
+        Position         = UDim2.new(1, 0, 0, 0),
+        Size             = UDim2.new(0, 1, 1, 0),
+        ZIndex           = 3,
+        Parent           = sidebarWrap,
+    })
+
+    -- ── Sidebar ScrollingFrame (nav items only — no border frames!) ───
     self.Sidebar = Inst("ScrollingFrame", {
         Name                  = "Sidebar",
         BackgroundColor3      = C.Bg,
+        BackgroundTransparency = 1,
         BorderSizePixel       = 0,
-        Size                  = UDim2.new(0, 175, 1, 0),
+        Size                  = UDim2.new(1, -1, 1, 0), -- -1 so border shows
         ScrollBarThickness    = 0,
         CanvasSize            = UDim2.new(0, 0, 0, 0),
         AutomaticCanvasSize   = Enum.AutomaticSize.Y,
         ScrollingDirection    = Enum.ScrollingDirection.Y,
-        Parent                = self.Body,
+        Parent                = sidebarWrap,
     })
-    VDivider(self.Sidebar, 174)  -- right border of sidebar
     List(self.Sidebar, 0)
     Pad(self.Sidebar, 8, 8, 0, 0)
 
@@ -418,8 +441,8 @@ function Library:_Build()
         ScrollingDirection    = Enum.ScrollingDirection.Y,
         Parent                = self.Body,
     })
-    List(self.ContentArea, 10)
-    Pad(self.ContentArea, 20, 20, 20, 20)
+    -- ContentArea has NO UIListLayout — each tab is a full-size child
+    -- that overlaps the others. Only one is Visible at a time.
 
     -- ── Resize handle (bottom-right corner) ──────────────────────────
     self:_BuildResizeHandle()
@@ -954,15 +977,24 @@ function Library:CreateTab(name, icon)
     })
 
     -- ── Content frame (right panel) ───────────────────────────────────
-    local content = Inst("Frame", {
-        Name             = name .. "_Content",
+    -- Each tab gets its own ScrollingFrame that fills the ContentArea.
+    -- They are NOT laid out by ContentArea's UIListLayout —
+    -- only one is Visible at a time and they all share the same space.
+    local content = Inst("ScrollingFrame", {
+        Name                  = name .. "_Content",
         BackgroundTransparency = 1,
-        Size             = UDim2.new(1, 0, 0, 0),
-        AutomaticSize    = Enum.AutomaticSize.Y,
-        Visible          = false,
-        Parent           = self.ContentArea,
+        BorderSizePixel        = 0,
+        Size                   = UDim2.new(1, 0, 1, 0),
+        CanvasSize             = UDim2.new(0, 0, 0, 0),
+        AutomaticCanvasSize    = Enum.AutomaticSize.Y,
+        ScrollBarThickness     = 2,
+        ScrollBarImageColor3   = C.LineMid,
+        ScrollingDirection     = Enum.ScrollingDirection.Y,
+        Visible                = false,
+        Parent                 = self.ContentArea,
     })
     List(content, 8)
+    Pad(content, 20, 20, 20, 20)
 
     -- ── Tab data table ────────────────────────────────────────────────
     local tab = {
@@ -1044,8 +1076,8 @@ function Library:_SelectTab(tab)
     tab.text.FontFace                 = F.SemiBold
     tab.icon.ImageColor3              = C.Fg
 
-    -- Reset content scroll to top
-    self.ContentArea.CanvasPosition = Vector2.zero
+    -- Reset this tab's scroll to top
+    tab.content.CanvasPosition = Vector2.zero
 end
 
 -- ══════════════════════════════════════════════════════════════════════
