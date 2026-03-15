@@ -1181,7 +1181,7 @@ function Library:_CreateFloatingShortcut(name, callback)
         ZIndex                = 8002,
         Parent                = wrapper,
     })
-    closeBtn.MouseEnter:Connect(function() closeBtn.TextColor3 = c.Danger end)
+    closeBtn.MouseEnter:Connect(function() closeBtn.TextColor3 = Color3.fromRGB(255, 59, 59) end)
     closeBtn.MouseLeave:Connect(function() closeBtn.TextColor3 = c.TextDark end)
     closeBtn.MouseButton1Click:Connect(function()
         wrapper:Destroy()
