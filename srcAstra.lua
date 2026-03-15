@@ -935,7 +935,6 @@ function Library._SelectTab(lib, tab, btn, stroke, icon, textLabel, textGradient
     btn.BackgroundTransparency = 0.85
     btn.BackgroundColor3       = c.Secondary
     icon.ImageColor3           = c.Text
-    stroke.Transparency        = 0
     if tab.accentBar then tab.accentBar.BackgroundTransparency = 0 end
     if textGradient then textGradient.Enabled = false end
     textLabel.TextColor3       = c.Text
