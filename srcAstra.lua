@@ -1239,44 +1239,41 @@ function Library:_CreateFloatingShortcut(name, callback)
         Parent                = wrapper,
     })
 
-    -- Drag + Tap unificado (apenas UM handler, sem duplicar callback)
-    local dragging = false
-    local dragStart, dragStartPos
-    local dragMoved = false
+    -- Flag compartilhada entre drag e click
+    local wasDragged = false
 
-    hitArea.InputBegan:Connect(function(inp)
+    -- DRAG: tracking no wrapper (Frame, não TextButton) — funciona em touch
+    wrapper.InputBegan:Connect(function(inp)
         if inp.UserInputType ~= Enum.UserInputType.Touch
         and inp.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-        dragging = true
-        dragMoved = false
-        dragStart = inp.Position
-        dragStartPos = wrapper.Position
-        Library._activeDragger = function(i)
-            if not dragging then return end
-            local d = i.Position - dragStart
-            if d.Magnitude > 10 then dragMoved = true end
-            if dragMoved then
-                wrapper.Position = UDim2.new(
-                    dragStartPos.X.Scale, dragStartPos.X.Offset + d.X,
-                    dragStartPos.Y.Scale, dragStartPos.Y.Offset + d.Y)
-            end
-        end
+        local startPos = inp.Position
+        local startWrapperPos = wrapper.Position
+        wasDragged = false
+
         local conn; conn = inp.Changed:Connect(function()
             if inp.UserInputState == Enum.UserInputState.End then
-                local wasDrag = dragMoved
-                dragging = false
-                dragMoved = false
-                Library._activeDragger = nil
                 conn:Disconnect()
-                -- Tap (não arrastou) → executar callback
-                if not wasDrag then
-                    Tween(wrapper, {BackgroundTransparency = 0.0}, animspeed.Fast)
-                    task.wait(0.1)
-                    Tween(wrapper, {BackgroundTransparency = 0.15}, animspeed.Fast)
-                    pcall(callback)
-                end
+                -- Reseta o flag depois de um frame (pra dar tempo do Click processar)
+                task.defer(function() wasDragged = false end)
+                return
+            end
+            local d = inp.Position - startPos
+            if d.Magnitude > 10 then
+                wasDragged = true
+                wrapper.Position = UDim2.new(
+                    startWrapperPos.X.Scale, startWrapperPos.X.Offset + d.X,
+                    startWrapperPos.Y.Scale, startWrapperPos.Y.Offset + d.Y)
             end
         end)
+    end)
+
+    -- TAP: MouseButton1Click dispara exatamente 1x por tap
+    hitArea.MouseButton1Click:Connect(function()
+        if wasDragged then return end
+        Tween(wrapper, {BackgroundTransparency = 0.0}, animspeed.Fast)
+        task.wait(0.1)
+        Tween(wrapper, {BackgroundTransparency = 0.15}, animspeed.Fast)
+        pcall(callback)
     end)
 
     self._shortcuts[name] = wrapper
