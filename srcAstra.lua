@@ -486,19 +486,29 @@ function Library:_CreateWindowControls()
     closeBtn.MouseEnter:Connect(function() closeBtn.ImageColor3 = Color3.fromRGB(255, 59, 59) end)
     closeBtn.MouseLeave:Connect(function() closeBtn.ImageColor3 = c.TextDark end)
 
-    local resizeBtn = New("ImageButton", {
-        Name                  = "Resize",
-        ImageColor3           = c.TextDark,
-        Image                 = "rbxassetid://120997033468887",
+    -- Resize handle sharp: dois frames diagonais, sem imagem arredondada
+    local resizeWrap = New("Frame", {
+        Name                   = "ResizeHandle",
         BackgroundTransparency = 1,
-        AnchorPoint           = Vector2.new(0.5, 0.5),
-        Position              = UDim2.new(1, -5, 1, -5),
-        Size                  = UDim2.new(0, 62, 0, 60),
-        BorderSizePixel       = 0,
-        Parent                = self.container,
+        AnchorPoint            = Vector2.new(1, 1),
+        Position               = UDim2.new(1, 0, 1, 0),
+        Size                   = UDim2.new(0, 14, 0, 14),
+        BorderSizePixel        = 0,
+        ZIndex                 = 8,
+        Parent                 = self.container,
     })
-    self.resizeBtn = resizeBtn
-    self:_SetupSmartResize(resizeBtn)
+    New("Frame", {BackgroundColor3=c.TextDark, BorderSizePixel=0,
+        AnchorPoint=Vector2.new(0.5,0.5), Position=UDim2.new(0.5,0,0.5,0),
+        Size=UDim2.new(0,1,1.2,0), Rotation=-45, ZIndex=9, Parent=resizeWrap})
+    New("Frame", {BackgroundColor3=c.TextDark, BorderSizePixel=0,
+        AnchorPoint=Vector2.new(0.5,0.5), Position=UDim2.new(0.5,4,0.5,0),
+        Size=UDim2.new(0,1,0.7,0), Rotation=-45, ZIndex=9, Parent=resizeWrap})
+    local resizeClickArea = New("TextButton", {
+        Text="", BackgroundTransparency=1,
+        Size=UDim2.new(1,0,1,0), ZIndex=10, Parent=resizeWrap,
+    })
+    self.resizeBtn = resizeWrap
+    self:_SetupSmartResize(resizeClickArea, resizeWrap)
 end
 
 function Library:_CreateContentArea()
@@ -550,12 +560,16 @@ function Library:_CreateContentArea()
     Padding(self.contentContainer, 10, 10, 15, 15)
 end
 
-function Library:_SetupSmartResize(handle)
+function Library:_SetupSmartResize(handle, visual)
     local resizing, resizeStart, startSize = false, nil, nil
-    handle.MouseEnter:Connect(function() handle.ImageColor3 = c.Text end)
-    handle.MouseLeave:Connect(function()
-        if not resizing then handle.ImageColor3 = c.TextDark end
-    end)
+    local function setColor(col)
+        if not visual then return end
+        for _, ch in ipairs(visual:GetChildren()) do
+            if ch:IsA("Frame") then ch.BackgroundColor3 = col end
+        end
+    end
+    handle.MouseEnter:Connect(function() setColor(c.Text) end)
+    handle.MouseLeave:Connect(function() if not resizing then setColor(c.TextDark) end end)
     handle.InputBegan:Connect(function(input)
         if input.UserInputType ~= Enum.UserInputType.MouseButton1
         and input.UserInputType ~= Enum.UserInputType.Touch then return end
@@ -576,12 +590,13 @@ function Library:_SetupSmartResize(handle)
             if input.UserInputState == Enum.UserInputState.End then
                 resizing = false
                 Library._activeDragger = nil
-                handle.ImageColor3 = c.TextDark
+                setColor(c.TextDark)
                 conn:Disconnect()
             end
         end)
     end)
 end
+
 
 function Library:_ToggleMinimize()
     self.minimized = not self.minimized
@@ -909,17 +924,34 @@ function Library._SelectTab(lib, tab, btn, stroke, icon, textLabel, textGradient
 end
 
 function Library._CreateContentSection(tab, name)
-    return New("TextLabel", {
+    local wrap = New("Frame", {
         Name             = "Section_"..name,
+        BackgroundColor3 = c.Background,
+        BorderSizePixel  = 0,
+        Size             = UDim2.new(1, 0, 0, 30),
+        Parent           = tab.content,
+    })
+    New("TextLabel", {
         FontFace         = f.Bold,
         TextColor3       = c.TextDark,
         Text             = string.upper(name),
         TextXAlignment   = Enum.TextXAlignment.Left,
         BackgroundTransparency = 1,
+        AnchorPoint      = Vector2.new(0, 1),
+        Position         = UDim2.new(0, 0, 1, -6),
+        Size             = UDim2.new(1, 0, 0, 12),
         TextSize         = textsize.Tiny,
-        Size             = UDim2.new(1, 0, 0, 22),
-        Parent           = tab.content,
+        Parent           = wrap,
     })
+    New("Frame", {
+        BackgroundColor3 = c.Border,
+        BorderSizePixel  = 0,
+        AnchorPoint      = Vector2.new(0, 1),
+        Position         = UDim2.new(0, 0, 1, 0),
+        Size             = UDim2.new(1, 0, 0, 1),
+        Parent           = wrap,
+    })
+    return wrap
 end
 
 function Library._CreateLabel(tab, config)
@@ -1177,17 +1209,16 @@ function Library._CreateCheckbox(tab, config)
         Thickness = 1.5,
         Parent    = checkBg,
     })
-    -- Checkmark ✓ visivel quando ativado
-    local checkMark = New("TextLabel", {
-        Text                  = "✓",
-        FontFace              = f.Bold,
-        TextSize              = 11,
-        TextColor3            = c.Checkbox.Check,
-        BackgroundTransparency = 1,
-        Size                  = UDim2.new(1, 0, 1, 0),
-        Visible               = enabled,
-        ZIndex                = 2,
-        Parent                = checkBg,
+    -- Quadrado branco centralizado como indicador (sem texto, limpo e alinhado)
+    local checkMark = New("Frame", {
+        BackgroundColor3 = c.Checkbox.Check,
+        BorderSizePixel  = 0,
+        AnchorPoint      = Vector2.new(0.5, 0.5),
+        Position         = UDim2.new(0.5, 0, 0.5, 0),
+        Size             = UDim2.new(0, 8, 0, 8),
+        Visible          = enabled,
+        ZIndex           = 2,
+        Parent           = checkBg,
     })
 
     local btn = New("TextButton", {Text="", BackgroundTransparency=1, Size=UDim2.new(1,0,1,0), Parent=frame})
