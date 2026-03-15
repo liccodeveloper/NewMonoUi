@@ -655,11 +655,16 @@ function Library:_ToggleMinimize()
     local topH = self._topBarHeight or 45
     self.minimized = not self.minimized
     if self.minimized then
+        self._preMinimizeWidth = self.container.AbsoluteSize.X
         self.mainContent.Size  = UDim2.new(1, 0, 0, 0)
-        self.container.Size    = UDim2.new(0, self.container.AbsoluteSize.X, 0, topH)
+        self.mainContent.Visible = false
+        local minW = IsMobile() and 160 or 200
+        self.container.Size    = UDim2.new(0, minW, 0, topH)
         if self.resizeBtn then self.resizeBtn.Visible = false end
     else
-        self.container.Size    = UDim2.new(0, self.container.AbsoluteSize.X, 0, self._originalHeight)
+        self.mainContent.Visible = true
+        local w = self._preMinimizeWidth or self._defaultSize.X
+        self.container.Size    = UDim2.new(0, w, 0, self._originalHeight)
         self.mainContent.Size  = UDim2.new(1, 0, 1, -(topH + 1))
         if self.resizeBtn then self.resizeBtn.Visible = true end
     end
@@ -1195,6 +1200,7 @@ function Library:_CreateFloatingShortcut(name, callback)
         AnchorPoint            = Vector2.new(1, 0),
         Position               = UDim2.new(1, -10, 0, startY),
         Size                   = UDim2.new(0, 120, 0, 36),
+        Visible                = false,
         ZIndex                 = 8000,
         Parent                 = screenGui,
     })
@@ -1230,6 +1236,7 @@ function Library:_CreateFloatingShortcut(name, callback)
     })
     closeBtn.MouseButton1Click:Connect(function()
         wrapper.Visible = false
+        self._shortcuts[name].dismissed = true
     end)
 
     -- Área de clique principal (executa callback)
@@ -1287,9 +1294,28 @@ function Library:_CreateFloatingShortcut(name, callback)
     end)
 
     -- Salvar referência para poder reexibir depois
-    self._shortcuts[name] = { wrapper = wrapper }
+    self._shortcuts[name] = { wrapper = wrapper, dismissed = false }
 
     return wrapper
+end
+
+-- Mostra o shortcut (chamado quando toggle liga)
+function Library:_ShowShortcut(name)
+    if not IsMobile() then return end
+    local sc = self._shortcuts[name]
+    if sc and sc.wrapper and sc.wrapper.Parent then
+        sc.wrapper.Visible = true
+        sc.dismissed = false
+    end
+end
+
+-- Esconde o shortcut (chamado quando toggle desliga)
+function Library:_HideShortcut(name)
+    if not IsMobile() then return end
+    local sc = self._shortcuts[name]
+    if sc and sc.wrapper then
+        sc.wrapper.Visible = false
+    end
 end
 
 function Library._CreateButton(tab, config)
@@ -1315,6 +1341,8 @@ function Library._CreateButton(tab, config)
     end)
     if shortcut then
         tab._library:_CreateFloatingShortcut(name, callback)
+        -- Button shortcut: always visible on mobile
+        tab._library:_ShowShortcut(name)
     end
     return {SetText = function(_, t) nameLbl.Text = t end}
 end
@@ -1366,9 +1394,24 @@ function Library._CreateToggle(tab, config)
             function() return enabled end, function(v) methods:SetValue(v) end)
     end
     if shortcut then
-        -- Para toggle o shortcut alterna o estado ao ser clicado
+        -- Criar o shortcut (começa hidden), alterna toggle ao clicar
         tab._library:_CreateFloatingShortcut(name, function()
             enabled = not enabled; UpdateToggle(); pcall(callback, enabled)
+            -- Se desligou, esconde o shortcut
+            if not enabled then tab._library:_HideShortcut(name) end
+        end)
+        -- Se toggle começa ligado, mostra shortcut
+        if enabled then tab._library:_ShowShortcut(name) end
+        -- Interceptar SetValue para controlar o shortcut
+        local origSetVal = methods.SetValue
+        methods.SetValue = function(self_, v)
+            origSetVal(self_, v)
+            if v then tab._library:_ShowShortcut(name) else tab._library:_HideShortcut(name) end
+        end
+        -- Interceptar o click do botão também
+        local origClick = btn.MouseButton1Click
+        btn.MouseButton1Click:Connect(function()
+            if enabled then tab._library:_ShowShortcut(name) else tab._library:_HideShortcut(name) end
         end)
     end
     return methods
@@ -1873,15 +1916,18 @@ function Library._CreateColorPicker(tab, config)
         end
     end
     svPicker.InputBegan:Connect(function(inp)
-        if inp.UserInputType~=Enum.UserInputType.MouseButton1 then return end
+        if inp.UserInputType~=Enum.UserInputType.MouseButton1
+        and inp.UserInputType~=Enum.UserInputType.Touch then return end
         svDragging=true; ProcessInput(inp); Library._activeDragger=ProcessInput
     end)
     hueSlider.InputBegan:Connect(function(inp)
-        if inp.UserInputType~=Enum.UserInputType.MouseButton1 then return end
+        if inp.UserInputType~=Enum.UserInputType.MouseButton1
+        and inp.UserInputType~=Enum.UserInputType.Touch then return end
         hueDragging=true; ProcessInput(inp); Library._activeDragger=ProcessInput
     end)
     ui.InputEnded:Connect(function(inp)
-        if inp.UserInputType==Enum.UserInputType.MouseButton1 then
+        if inp.UserInputType==Enum.UserInputType.MouseButton1
+        or inp.UserInputType==Enum.UserInputType.Touch then
             svDragging=false; hueDragging=false; Library._activeDragger=nil
         end
     end)
